@@ -3,17 +3,10 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
-import java.sql.Time;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 
 /**
  *
- * This class does
  * Part of TrafficLight classes written for the final project of CMSC335.
  *
  * Driver class of the program which constructs a GUI and creates a TrafficManager and MainDisplay object.
@@ -24,53 +17,45 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class Driver extends JFrame {
 
 
-
-    //Jbutton names
+    //Jbutton names which are processed in an array
     private static final String[] BUTTON_NAMES = {
-            "Start", "Pause", "Resume", "Stop", "Add Car", "Add Traffic Light"
+            "Start", "Stop", "Add Car", "Add Traffic Light"
     };
 
-    private TrafficManager trafficManager;
-    MainDisplay main;
-
-    static JLabel currentTimeLabel = new JLabel();
-
-
-    private final int DEFAULT_TRAFFIC_LIGHTS = 3;
-    private final int DEFAULT_CARS = 2;
-
-    static Thread time;
-
-    private int statusID = 0;
+    private MainDisplay main;
+    private static final int DEFAULT_TRAFFIC_LIGHTS = 3, DEFAULT_CARS = 3; //initial amounts for lights & cars
+    private static int statusID = 0;
 
     //create jframe
     public Driver() throws Exception {
         super("Traffic Light Simulator");
-
         assembleGUI();
-        setSize(new Dimension(750, 500));
+        setSize(new Dimension(1000, 400));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
 
     /**
      * Assemble GUI method which creates multiple JPanels and different components to create the GUI and actionlisteners.
-     * @throws IOException
      */
     private void assembleGUI() throws Exception {
 
+        LightManager lightManager = new LightManager();
+        CarManager carManager = new CarManager();
+
+        Thread lightManagerThread = new Thread(lightManager);
+        Thread carManagerThread = new Thread(carManager);
+
+        ArrayList<Thread> lightThreads = LightManager.getTrafficThreads();
+        ArrayList<Thread> carThreads = CarManager.getCarThreads();
+
         ArrayList<JButton> buttonList = createButtons(BUTTON_NAMES);
 
-
-
-        //traffic manager object which gives specifications for a panel
-        trafficManager = new TrafficManager(700, 250, 1L);
-
         //main display object which paints a panel
-        main = new MainDisplay(trafficManager);
+        main = new MainDisplay(lightManager, carManager);
 
-        //create 2 cars and 3 traffic lights (default amount)
-        trafficManager.addCar(DEFAULT_CARS);
-        trafficManager.addTrafficLight(DEFAULT_TRAFFIC_LIGHTS);
+        //create 3 cars and 3 traffic lights (default amount)
+        carManager.addCar(DEFAULT_CARS);
+        lightManager.addTrafficLight(DEFAULT_TRAFFIC_LIGHTS);
 
         //PANELS
         JPanel topPanel = new JPanel(new BorderLayout());
@@ -87,18 +72,12 @@ public class Driver extends JFrame {
         topPanel.add(introductionMessage, BorderLayout.NORTH);
         topPanel.add(simulationStatus, BorderLayout.CENTER);
 
-        //BUTTON PANEL
-        for (int i = 0; i < buttonList.size(); i++) {
-            buttonPanel.add(buttonList.get(i));
+        for (JButton jButton : buttonList) {
+            buttonPanel.add(jButton);
         }
-
-        //INFO PANEL, nests topPanel and buttonPanel as well as adds currentTime
-        JLabel currentTime = new JLabel("Current Time: " + currentTimeLabel.getText(), SwingConstants.CENTER);
-        currentTime.setFont(new Font("Serif", Font.BOLD, 12));
 
         infoPanel.add(topPanel, BorderLayout.NORTH);
         infoPanel.add(buttonPanel, BorderLayout.CENTER);
-        infoPanel.add(currentTime, BorderLayout.SOUTH);
 
         add(infoPanel, BorderLayout.NORTH);
         add(main);
@@ -110,132 +89,143 @@ public class Driver extends JFrame {
         add(tableData, BorderLayout.SOUTH);
 
 
-        //Start Button action listener
-        buttonList.get(0).addActionListener(e -> {
-            statusID = 1;
-            simulationStatus.setText("Simulation Status: "+ getSimulatorStatus());
-
-            for(int i = 0; i < trafficManager.getTrafficLights().size(); i++) {
-                trafficManager.getTrafficLights().get(i).startThread();
-            }
-
-            for(int i = 0; i < trafficManager.getCarList().size(); i++) {
-                trafficManager.getCarList().get(i).startThread();
-            }
-
-            Thread thread = new Thread(trafficManager);
-            thread.start();
-        });
-
-        //Pause Button action listener
-        buttonList.get(1).addActionListener(e -> {
-            statusID = 2;
-            simulationStatus.setText("Simulation Status: " + getSimulatorStatus());
-
-
-
-        });
-
-        //Resume Button action listener
-        buttonList.get(2).addActionListener(e -> {
-
-            for(int i = 0; i < trafficManager.getCarList().size(); i++) {
-                trafficManager.getCarList().get(i).resume();
-            }
-
-            statusID = 3;
-            simulationStatus.setText("Simulation Status: " + getSimulatorStatus());
-
-
-        });
-
-        //Stop Button action listener
-        buttonList.get(3).addActionListener(e -> {
-
-
-            for(int i = 0; i < trafficManager.getCarList().size(); i++) {
-                try {
-                    trafficManager.getCarList().get(i).stopThread();
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
-                }
-            }
-
-            for(int i = 0; i < trafficManager.getTrafficLights().size(); i++) {
-                try {
-                    trafficManager.getTrafficLights().get(i).suspend();
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
-                }
-            }
-
-
-            statusID = 4;
-            simulationStatus.setText("Simulation Status: " + getSimulatorStatus());
-        });
-
-        //Add Car action listener
-        buttonList.get(4).addActionListener(e -> {
-
-            try {
-                trafficManager.addCar(1);
-                ArrayList<Car> carList = trafficManager.getCarList();
-                Car car = carList.get(carList.size()-1);
-                car.startThread();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-
-        });
-
-
-        //Add Intersection action listener
-        buttonList.get(5).addActionListener(e -> {
-
-            try {
-                trafficManager.addTrafficLight(1);
-                ArrayList<TrafficLight> trafficLights= trafficManager.getTrafficLights();
-                TrafficLight trafficLight = trafficLights.get(trafficLights.size()-1);
-                Thread thread = new Thread(trafficLight);
-                thread.start();
-
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(null, ex.getMessage());
-            }});
-
-
-        new Timer(40, new ActionListener() {
+        //Start Button
+        buttonList.get(0).addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                main.repaint();
+
+                if (getSimulatorStatus().equals("Ready to Begin")) {
+
+                    statusID = 1;
+                    simulationStatus.setText("Simulation Status: "+ getSimulatorStatus());
+
+                    for(Car car: CarManager.getCarList()) {
+                        car.setCarStatus(statusID);
+                    }
+
+                    for(TrafficLight trafficLight: LightManager.getTrafficLights()) {
+                        trafficLight.setLightStatus(statusID);
+                    }
+
+                    for(Thread carThread: carThreads) {
+                        carThread.start();
+                    }
+
+                    for(Thread lightThread: lightThreads) {
+                        lightThread.start();
+                    }
+
+                    lightManager.setManagerStatus(statusID);
+                    lightManagerThread.start();
+
+                    carManager.setManagerStatus(statusID);
+                    carManagerThread.start();
+
+                    new Timer(40, new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            main.repaint();
+                        }
+                    }).start();
+
+                } else {
+                    try {
+                        JOptionPane.showMessageDialog(null, "Error: Simulation needs to be restarted.");
+                        throw new Exception("Error: Simulation needs to be restarted.");
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                }
             }
-        }).start();
+        });
+
+        //Stop Button
+        buttonList.get(1).addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (getSimulatorStatus().equals("Started")) {
+                    statusID = 2;
+                    lightManager.setManagerStatus(statusID);
+                    carManager.setManagerStatus(statusID);
+                    simulationStatus.setText("Simulation Status: " + getSimulatorStatus());
+
+                    for (Car car : CarManager.getCarList()) {
+                        car.setCarStatus(0);
+                    }
+
+                    for (TrafficLight trafficLight : LightManager.getTrafficLights()) {
+                        trafficLight.setLightStatus(0);
+                    }
+
+                    for (Thread carThread : carThreads) {
+                        carThread.interrupt();
+                    }
+
+                    for (Thread lightThread : lightThreads) {
+                        lightThread.interrupt();
+                    }
+                } else {
+                    try {
+                        JOptionPane.showMessageDialog(null, "Error: Simulation is not active.");
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        });
+
+        //Add Car button
+        buttonList.get(2).addActionListener(e -> {
+            if (getSimulatorStatus().equals("Ready to Begin")) {
+                try {
+                    carManager.addCar(1);
+                    main.repaint();
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(null, ex.getMessage());
+                }
+            } else {
+                JOptionPane.showMessageDialog(null, "Unable to add cars during/after a simulation.");
+            }
+        });
+
+        //Add Intersection button
+        buttonList.get(3).addActionListener(e -> {
+            if (getSimulatorStatus().equals("Ready to Begin")) {
+            try {
+                lightManager.addTrafficLight(1);
+                main.repaint();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(null, ex.getMessage());
+                }
+            } else {
+                JOptionPane.showMessageDialog(null, "Unable to add intersections during/after a simulation.");
+            }
+        });
+
+
     }
 
     /**
-     * Basic method to iterate over a list to create JButtons
+     * Iterates over String array for buttons.
      * @param buttonNames the names of buttons needed for GUI.
      * @return a list of JButtons for the GUI
      */
     private ArrayList<JButton> createButtons(String[] buttonNames) {
         ArrayList<JButton> buttonList = new ArrayList<>();
 
-        for(int i = 0; i < buttonNames.length; i++) {
-            buttonList.add(createButton(buttonNames[i]));
+        for (String buttonName : buttonNames) {
+            buttonList.add(createButton(buttonName));
         }
         return buttonList;
     }
 
     /**
-     * Simple createbutton method to create a JButton and return.
+     * createButton method to create a JButton and return.
      * @param name the name of the JButton
      * @return the JButton that was created
      */
     private JButton createButton(String name) {
-        JButton button = new JButton(name);
-        return button;
+        return new JButton(name);
     }
 
     /**
@@ -243,13 +233,11 @@ public class Driver extends JFrame {
      * @return the status of the program.
      */
     private String getSimulatorStatus() {
-        switch(statusID) {
-            case 1: return "Active";
-            case 2: return "Paused";
-            case 3: return "Resumed";
-            case 4: return "Stopped";
-        }
-        return "Not Active";
+        return switch (statusID) {
+            case 1 -> "Started";
+            case 2 -> "Ended";
+            default -> "Ready to Begin";
+        };
     }
 
     //Main Method
@@ -257,7 +245,5 @@ public class Driver extends JFrame {
         Driver driver = new Driver();
         driver.setVisible(true);
     }
-
-
 
 }

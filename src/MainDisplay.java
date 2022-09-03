@@ -1,6 +1,5 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.geom.Line2D;
 import java.util.ArrayList;
 
 
@@ -9,26 +8,25 @@ import java.util.ArrayList;
  */
 public class MainDisplay extends JPanel {
 
-    private ArrayList<Car> carList; //list of cars to be painted
-    private ArrayList<TrafficLight> trafficLights; //list of lights to be painted
+    private final ArrayList<Car> carList; //cars and lights to be painted
+    private final ArrayList<TrafficLight> trafficLights;
 
-    private static final int CAR_SIZEW = 40; //default size of car width
-    private static final int CAR_SIZEH = 30; //default size of car height
+    private static final int CAR_SIZEW = 40; //car height and width
+    private static final int CAR_SIZEH = 30;
 
-    private static final int LIGHT_SIZEW = 50; //default size of light width
-    private static final int LIGHT_SIZEH = 50; //default size of light height
+    private static final int LIGHT_SIZEW = 50;
+    private static final int LIGHT_SIZEH = 50;
 
 
     /**
      * Create maindisplay object which gets lists of cars and lights and sets the size of the drawing panel.
-     * @param trafficManager the manager which will give lists and dimensions of panel.
+     * @param lightManager the manager which will give lists and dimensions of panel.
      */
-    public MainDisplay(TrafficManager trafficManager) {
+    public MainDisplay(LightManager lightManager, CarManager carManager) {
         super();
-
-        trafficLights = trafficManager.getTrafficLights();
-        carList = trafficManager.getCarList();
-        this.setSize(trafficManager.getWidth(), trafficManager.getHeight());
+        trafficLights = lightManager.getTrafficLights();
+        carList = carManager.getCarList();
+        this.setSize(1000, 400);
     }
 
 
@@ -40,41 +38,33 @@ public class MainDisplay extends JPanel {
     @Override
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.drawLine(0, 40, 700, 40); //main line for the panel
+        g.drawLine(0, 40, 1000, 40); //main line for the panel
         g.setFont(new Font("Serif", Font.BOLD, 10));
 
 
         //draw traffic lights
-        synchronized (trafficLights) {
             trafficLights.forEach(trafficLight -> {
                 //draw each image of a traffic light and set it to x position and y position as well as the default size
-                g.drawImage(trafficLight.getImage(), trafficLight.getXPosition(), trafficLight.getYPosition() - 10, LIGHT_SIZEW, LIGHT_SIZEH, this);
+                g.drawImage(trafficLight.getImage(), (int) trafficLight.getPosition(),  0, LIGHT_SIZEW, LIGHT_SIZEH, this);
                 switch(trafficLight.getColor()) { //set color of string
                     case RED -> g.setColor(Color.RED);
                     case GREEN -> g.setColor(Color.GREEN);
                     case YELLOW -> g.setColor(Color.YELLOW);
                 }
                 //label for intersection which is colored depending on traffic light color
-                g.drawString("Intersection " + trafficLight.getTrafficLightName(), trafficLight.getXPosition() - 10, trafficLight.getYPosition() + 75);
-
+                g.drawString("Intersection " + trafficLight.getTrafficLightID(), (int) (trafficLight.getPosition() - 10), 75);
             });
-        }
-
-        synchronized (carList) {
 
             //draw each car
             carList.forEach(car -> {
                 //draw each image of a car and set it to x position and y position as well as the default size
-                g.drawImage(car.getImage(), (int) car.getXPosition(), car.getYPosition() + 10, CAR_SIZEW, CAR_SIZEH, this);
+                g.drawImage(car.getImage(), (int) car.getPosition(), 10, CAR_SIZEW, CAR_SIZEH, this);
                 g.setColor(Color.BLACK);
-                //draw name of car
-                g.drawString(car.getCarName(), (int) car.getXPosition() + 15, car.getYPosition() + 50);
-                //draw x coordinate
-                g.drawString("X: "+ car.getXPosition(), (int) car.getXPosition() + 15, car.getYPosition() + 75);
-                //draw speed of car
-                g.drawString("Speed: "+ car.calculateSpeed(), (int) car.getXPosition() + 15, car.getYPosition() + 100);
+                g.drawString(String.valueOf(car.getCarID()), (int) car.getPosition() + 15, 50);
+                g.drawString("X: "+ car.getPosition(), (int) car.getPosition() + 15, 75);
+                g.drawString("Speed: "+ car.calculateSpeed(), (int) car.getPosition() + 15, 100);
             });
-        }
+
 
     }
 
